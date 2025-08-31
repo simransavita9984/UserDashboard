@@ -1,21 +1,36 @@
 // src/hooks/useUsers.ts
 import { useEffect } from 'react';
-import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
-import { usersState, loadingState, errorState, fetchUsers } from '../atoms/userAtoms';
-import { User, CreateUserData } from '../types';
+import { useRecoilState } from 'recoil';
+import { usersState, loadingState, errorState } from '../atoms/userAtoms';
+import type { User, CreateUserData } from '../types/index';
 
 export const useUsers = () => {
   const [users, setUsers] = useRecoilState(usersState);
   const [loading, setLoading] = useRecoilState(loadingState);
   const [error, setError] = useRecoilState(errorState);
-  const fetchedUsers = useRecoilValue(fetchUsers);
 
   // Fetch users on initial load
   useEffect(() => {
-    if (fetchedUsers.length > 0 && users.length === 0) {
-      setUsers(fetchedUsers);
+    const fetchInitialUsers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/users');
+        if (!response.ok) throw new Error('Failed to fetch users');
+        const data: User[] = await response.json();
+        setUsers(data);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (users.length === 0) {
+      fetchInitialUsers();
     }
-  }, [fetchedUsers, setUsers, users.length]);
+  }, [setUsers, setLoading, setError, users.length]);
 
   // Create a new user
   const createUser = async (userData: CreateUserData): Promise<User> => {
@@ -24,31 +39,26 @@ export const useUsers = () => {
     try {
       const response = await fetch('https://jsonplaceholder.typicode.com/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create user');
-      }
-      
+
+      if (!response.ok) throw new Error('Failed to create user...Try Again Later');
+
       const newUser = await response.json();
-      // Generate a temporary ID for local state management
-      const userWithId = { 
-        ...newUser, 
+      const userWithId = {
+        ...newUser,
         id: Math.max(...users.map(u => u.id), 0) + 1,
-        username: userData.username || userData.name.toLowerCase().replace(/\s+/g, '')
+        username: userData.username || userData.name.toLowerCase().replace(/\s+/g, ''),
       };
-      setUsers(prev => [...prev, userWithId]);
-      setLoading(false);
+      setUsers(prev => [userWithId, ...prev]);
       return userWithId;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
-      setLoading(false);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,25 +69,21 @@ export const useUsers = () => {
     try {
       const response = await fetch(`https://jsonplaceholder.typicode.com/users/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update user');
-      }
-      
+
+      if (!response.ok) throw new Error('Failed to update user');
+
       const updatedUser = await response.json();
-      setUsers(prev => prev.map(user => user.id === id ? { ...user, ...updatedUser } : user));
-      setLoading(false);
+      setUsers(prev => prev.map(user => (user.id === id ? { ...user, ...updatedUser } : user)));
       return updatedUser;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
-      setLoading(false);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,18 +95,16 @@ export const useUsers = () => {
       const response = await fetch(`https://jsonplaceholder.typicode.com/users/${id}`, {
         method: 'DELETE',
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
-      }
-      
+
+      if (!response.ok) throw new Error('Failed to delete user');
+
       setUsers(prev => prev.filter(user => user.id !== id));
-      setLoading(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
-      setLoading(false);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 

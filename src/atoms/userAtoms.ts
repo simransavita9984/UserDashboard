@@ -1,6 +1,5 @@
-// src/atoms/userAtoms.ts
 import { atom, selector } from 'recoil';
-import { User } from '../types'; 
+import type { User } from '../types/index'; 
 
 // State for user list
 export const usersState = atom<User[]>({
